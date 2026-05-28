@@ -1,15 +1,15 @@
 --[[
 ╔══════════════════════════════════════════════════════════════╗
-║              NeonHub UI Library  v2.0                        ║
+║              NeonHub UI Library  v2.1                        ║
 ║         Mobile Optimized | Dark Theme | 15 Elements          ║
 ║   Key System | Loading | Save/Load | 20 Themes | Draggable   ║
 ╚══════════════════════════════════════════════════════════════╝
 
-USAGE EXAMPLE (bottom of this file):
+USAGE EXAMPLE:
 
     local NeonHub = loadstring(game:HttpGet("URL_HERE"))()
 
-    -- 1) Key System (runs first, blocks until valid)
+    -- 1) Key System
     NeonHub:KeySystem({
         Text            = "Key System",
         KeySystem       = true,
@@ -18,6 +18,9 @@ USAGE EXAMPLE (bottom of this file):
         KeyJson         = "Key_NeonHub.json",
         GetKeyBySite    = true,
         KeySite         = "https://pastebin.com/raw/YOURPASTE",
+        -- IDs de imagem (opcional, deixe "" para padrão)
+        Minimize_button_image_id = (""),   -- ID da imagem do botão minimizar/abrir
+        UI_Library_Fund          = (""),   -- ID da imagem do fundo da UI
     })
 
     -- 2) Loading Screen
@@ -28,15 +31,12 @@ USAGE EXAMPLE (bottom of this file):
 
     -- 3) Create Window
     local Win = NeonHub:CreateWindow({
-        Name            = "NeonHub",
-        SubTitle        = "by .ftgs",
-        ToggleImageId   = "",   -- Roblox asset id (string) or leave ""
-        BackgroundImageId = "", -- Roblox asset id (string) or leave ""
+        Name     = "NeonHub",
+        SubTitle = "by .ftgs",
     })
 
     -- 4) Add tabs + elements
     local Tab = Win:AddTab("Main", "🏠")
-    -- ... (see examples below the library)
 
     -- 5) Add built-in Config tab
     Win:AddConfig()
@@ -131,13 +131,12 @@ local Themes = {
     Matrix    = {BG=Color3.fromRGB(0,8,0),       Side=Color3.fromRGB(0,5,0),      El=Color3.fromRGB(0,15,0),     Tx=Color3.fromRGB(0,255,70),    Sub=Color3.fromRGB(0,180,50),    Acc=Color3.fromRGB(0,255,70),    Sl=Color3.fromRGB(0,200,50),    Btn=Color3.fromRGB(0,20,0),    Brd=Color3.fromRGB(0,50,0)},
 }
 
--- Sorted list for dropdown
 local ThemeNames = {}
 for k in next, Themes do table.insert(ThemeNames, k) end
 table.sort(ThemeNames)
 
 -- ══════════════════════════════════════════════════════════════
---  SAVE SYSTEM (executor functions: writefile, readfile, etc.)
+--  SAVE SYSTEM
 -- ══════════════════════════════════════════════════════════════
 local SaveFolder = "Neon_Savess"
 
@@ -183,15 +182,49 @@ end
 local NeonHub = {}
 NeonHub.__index = NeonHub
 
+-- Configurações globais da biblioteca
 local LibConfig = {
-    Theme        = "Dark",
-    Transparency = false,
-    SaveName     = "MySave",
-    AutoLoad     = false,
-    AutoLoadSave = "",
+    Theme                  = "Dark",
+    Transparency           = false,
+    SaveName               = "MySave",
+    AutoLoad               = false,
+    AutoLoadSave           = "",
+    Minimize_button_image_id = "",
+    UI_Library_Fund          = "",
 }
-local CurrentTheme      = Themes["Dark"]
-local RegisteredElements = {} -- flag -> {Get, Set, Type}
+
+local CurrentTheme       = Themes["Dark"]
+local RegisteredElements = {}
+
+-- Referências globais para aplicação de tema em tempo real
+local _MainFrame   = nil
+local _TitleBar    = nil
+local _Sidebar     = nil
+local _ToggleBtn   = nil
+local _BgImageLbl  = nil
+local _ToggleImgLbl = nil
+local _AllElements = {} -- lista de {instance, prop, themeKey}
+
+-- ══════════════════════════════════════════════════════════════
+--  APLICA TEMA EM TEMPO REAL
+-- ══════════════════════════════════════════════════════════════
+local function ApplyTheme(themeName)
+    if not Themes[themeName] then return end
+    LibConfig.Theme = themeName
+    CurrentTheme    = Themes[themeName]
+    local T         = CurrentTheme
+
+    -- Redesenha os elementos registrados para o tema
+    for _, entry in ipairs(_AllElements) do
+        local ok = pcall(function()
+            entry.inst[entry.prop] = T[entry.key]
+        end)
+    end
+end
+
+local function RegisterThemeProp(inst, prop, themeKey)
+    table.insert(_AllElements, {inst=inst, prop=prop, key=themeKey})
+end
 
 -- ══════════════════════════════════════════════════════════════
 --  KEY SYSTEM
@@ -206,6 +239,14 @@ function NeonHub:KeySystem(cfg)
     cfg.GetKeyBySite = cfg.GetKeyBySite ~= nil and cfg.GetKeyBySite or false
     cfg.KeySite      = cfg.KeySite     or ""
 
+    -- ── Salva os IDs de imagem nas configurações globais ──────
+    if cfg.Minimize_button_image_id and cfg.Minimize_button_image_id ~= "" then
+        LibConfig.Minimize_button_image_id = tostring(cfg.Minimize_button_image_id)
+    end
+    if cfg.UI_Library_Fund and cfg.UI_Library_Fund ~= "" then
+        LibConfig.UI_Library_Fund = tostring(cfg.UI_Library_Fund)
+    end
+
     if not cfg.KeySystem then return true end
 
     -- Auto-load saved key
@@ -214,7 +255,7 @@ function NeonHub:KeySystem(cfg)
         if ok and saved == cfg.Key then return true end
     end
 
-    local T  = CurrentTheme
+    local T      = CurrentTheme
     local result = false
 
     local gui = New("ScreenGui", {
@@ -225,10 +266,10 @@ function NeonHub:KeySystem(cfg)
     })
 
     New("Frame", {
-        Size                 = UDim2.fromScale(1, 1),
-        BackgroundColor3     = Color3.fromRGB(0, 0, 0),
+        Size                   = UDim2.fromScale(1, 1),
+        BackgroundColor3       = Color3.fromRGB(0, 0, 0),
         BackgroundTransparency = 0.45,
-        Parent               = gui,
+        Parent                 = gui,
     })
 
     local win = New("Frame", {
@@ -239,11 +280,10 @@ function NeonHub:KeySystem(cfg)
         BorderSizePixel  = 0,
         Parent           = gui,
     })
-    New("UICorner",  {CornerRadius = UDim.new(0, 14), Parent = win})
+    New("UICorner", {CornerRadius = UDim.new(0, 14), Parent = win})
     New("UIStroke",  {Color = T.Brd, Thickness = 1.5, Parent = win})
     MakeDraggable(win)
 
-    -- Header bar
     local hdr = New("Frame", {
         Size             = UDim2.new(1, 0, 0, 44),
         BackgroundColor3 = T.Side,
@@ -278,7 +318,7 @@ function NeonHub:KeySystem(cfg)
         ClearTextOnFocus=false, Parent=win,
     })
     New("UICorner", {CornerRadius=UDim.new(0,8), Parent=box})
-    New("UIStroke", {Color=T.Brd, Thickness=1, Parent=box})
+    New("UIStroke",  {Color=T.Brd, Thickness=1, Parent=box})
     New("UIPadding", {PaddingLeft=UDim.new(0,10), Parent=box})
 
     local errLbl = New("TextLabel", {
@@ -297,8 +337,7 @@ function NeonHub:KeySystem(cfg)
 
     submitBtn.MouseButton1Click:Connect(function()
         local entered = box.Text
-        -- Check site key if enabled
-        local valid = false
+        local valid   = false
         if cfg.GetKeyBySite and cfg.KeySite ~= "" then
             local ok, res = pcall(function() return game:HttpGet(cfg.KeySite) end)
             if ok and res then
@@ -343,7 +382,6 @@ function NeonHub:LoadingScreen(cfg)
         BorderSizePixel=0, Parent=gui,
     })
 
-    -- Animated dots / spinner
     local spinner = New("TextLabel", {
         Text="◉", Font=Enum.Font.GothamBold, TextSize=48,
         TextColor3=T.Acc, BackgroundTransparency=1,
@@ -365,7 +403,6 @@ function NeonHub:LoadingScreen(cfg)
         TextXAlignment=Enum.TextXAlignment.Center, Parent=bg,
     })
 
-    -- Progress bar
     local barBg = New("Frame", {
         Size=UDim2.new(0.5,0,0,6), Position=UDim2.new(0.25,0,0.62,0),
         BackgroundColor3=T.El, BorderSizePixel=0, Parent=bg,
@@ -383,7 +420,6 @@ function NeonHub:LoadingScreen(cfg)
         TextXAlignment=Enum.TextXAlignment.Center, Parent=bg,
     })
 
-    -- Spin the spinner
     local spinConn
     local rot = 0
     spinConn = RunService.Heartbeat:Connect(function(dt)
@@ -391,7 +427,6 @@ function NeonHub:LoadingScreen(cfg)
         spinner.Rotation = rot
     end)
 
-    -- Animate bar
     local startT = tick()
     local progConn
     progConn = RunService.Heartbeat:Connect(function()
@@ -415,27 +450,28 @@ end
 -- ══════════════════════════════════════════════════════════════
 function NeonHub:CreateWindow(cfg)
     cfg = cfg or {}
-    cfg.Name              = cfg.Name             or "NeonHub"
-    cfg.SubTitle          = cfg.SubTitle         or "UI Library"
-    cfg.Width             = cfg.Width            or 600
-    cfg.Height            = cfg.Height           or 420
-    cfg.ToggleImageId     = cfg.ToggleImageId    or ""
-    cfg.BackgroundImageId = cfg.BackgroundImageId or ""
+    cfg.Name    = cfg.Name    or "NeonHub"
+    cfg.SubTitle = cfg.SubTitle or "UI Library"
+    cfg.Width   = cfg.Width   or 600
+    cfg.Height  = cfg.Height  or 420
 
+    -- Aplica tema salvo
     if Themes[LibConfig.Theme] then
         CurrentTheme = Themes[LibConfig.Theme]
     end
     local T = CurrentTheme
 
+    -- Limpa lista de elementos de tema para essa janela
+    _AllElements = {}
+
     local Win = { Tabs={}, _tabFrames={}, _tabBtns={} }
 
-    -- ScreenGui
     local Gui = New("ScreenGui", {
         Name="NeonHub_Main", ResetOnSpawn=false,
         ZIndexBehavior=Enum.ZIndexBehavior.Sibling, Parent=PlayerGui,
     })
 
-    -- Main frame
+    -- ── Main frame ────────────────────────────────────────────
     local MainFrame = New("Frame", {
         Size=UDim2.fromOffset(cfg.Width, cfg.Height),
         Position=UDim2.fromScale(0.5,0.5),
@@ -445,28 +481,36 @@ function NeonHub:CreateWindow(cfg)
         BorderSizePixel=0, ClipsDescendants=true, Parent=Gui,
     })
     New("UICorner", {CornerRadius=UDim.new(0,12), Parent=MainFrame})
-    New("UIStroke", {Color=T.Brd, Thickness=1.5, Parent=MainFrame})
+    local mfStroke = New("UIStroke", {Color=T.Brd, Thickness=1.5, Parent=MainFrame})
+    _MainFrame = MainFrame
 
-    -- Optional BG image
-    if cfg.BackgroundImageId ~= "" then
-        New("ImageLabel", {
-            Image="rbxassetid://"..cfg.BackgroundImageId,
-            Size=UDim2.fromScale(1,1), BackgroundTransparency=1,
-            ScaleType=Enum.ScaleType.Crop, ZIndex=0, Parent=MainFrame,
-        })
-    end
+    RegisterThemeProp(MainFrame, "BackgroundColor3", "BG")
+    RegisterThemeProp(mfStroke,  "Color",            "Brd")
 
-    -- ── Title bar ──────────────────────────────────────────────
+    -- ── Fundo da UI (UI_Library_Fund) ─────────────────────────
+    local bgImageLbl = New("ImageLabel", {
+        Image = LibConfig.UI_Library_Fund ~= "" and ("rbxassetid://"..LibConfig.UI_Library_Fund) or "",
+        Size=UDim2.fromScale(1,1), BackgroundTransparency=1,
+        ScaleType=Enum.ScaleType.Crop, ZIndex=0,
+        Visible = LibConfig.UI_Library_Fund ~= "",
+        Parent=MainFrame,
+    })
+    _BgImageLbl = bgImageLbl
+
+    -- ── Title bar ─────────────────────────────────────────────
     local TitleBar = New("Frame", {
         Size=UDim2.new(1,0,0,44),
         BackgroundColor3=T.Side,
         BorderSizePixel=0, ZIndex=3, Parent=MainFrame,
     })
     New("UICorner", {CornerRadius=UDim.new(0,12), Parent=TitleBar})
-    New("Frame", {  -- fill bottom-rounded gap
+    New("Frame", {
         Size=UDim2.new(1,0,0.5,0), Position=UDim2.fromScale(0,0.5),
         BackgroundColor3=T.Side, BorderSizePixel=0, ZIndex=2, Parent=TitleBar,
     })
+    RegisterThemeProp(TitleBar, "BackgroundColor3", "Side")
+    _TitleBar = TitleBar
+
     New("TextLabel", {
         Text="◉", Font=Enum.Font.GothamBold, TextSize=18,
         TextColor3=T.Acc, BackgroundTransparency=1,
@@ -484,6 +528,7 @@ function NeonHub:CreateWindow(cfg)
         Size=UDim2.fromOffset(250,16), Position=UDim2.fromOffset(44,22),
         TextXAlignment=Enum.TextXAlignment.Left, ZIndex=4, Parent=TitleBar,
     })
+
     local CloseBtn = New("TextButton", {
         Text="✕", Font=Enum.Font.GothamBold, TextSize=16,
         TextColor3=T.Sub, BackgroundTransparency=1,
@@ -491,19 +536,20 @@ function NeonHub:CreateWindow(cfg)
     })
     MakeDraggable(MainFrame, TitleBar)
 
-    -- ── Body ───────────────────────────────────────────────────
+    -- ── Body ──────────────────────────────────────────────────
     local Body = New("Frame", {
         Size=UDim2.new(1,0,1,-44), Position=UDim2.fromOffset(0,44),
         BackgroundTransparency=1, Parent=MainFrame,
     })
 
-    -- Sidebar
     local Sidebar = New("Frame", {
         Size=UDim2.new(0,175,1,0),
         BackgroundColor3=T.Side,
         BackgroundTransparency = LibConfig.Transparency and 0.4 or 0,
         BorderSizePixel=0, Parent=Body,
     })
+    RegisterThemeProp(Sidebar, "BackgroundColor3", "Side")
+    _Sidebar = Sidebar
 
     local SideList = New("ScrollingFrame", {
         Size=UDim2.new(1,-8,1,-8), Position=UDim2.fromOffset(4,4),
@@ -515,14 +561,13 @@ function NeonHub:CreateWindow(cfg)
     New("UIListLayout", {Padding=UDim.new(0,4), SortOrder=Enum.SortOrder.LayoutOrder, Parent=SideList})
     New("UIPadding", {PaddingTop=UDim.new(0,4), PaddingBottom=UDim.new(0,4), Parent=SideList})
 
-    -- Content area
     local ContentArea = New("Frame", {
         Size=UDim2.new(1,-175,1,0), Position=UDim2.fromOffset(175,0),
         BackgroundTransparency=1, ClipsDescendants=true, Parent=Body,
     })
 
-    -- ── Toggle Button (floating, draggable) ─────────────────────
-    local IsOpen   = true
+    -- ── Toggle Button (floating, draggable) ───────────────────
+    local IsOpen    = true
     local ToggleBtn = New("ImageButton", {
         Size=UDim2.fromOffset(48,48),
         Position=UDim2.new(0,20,0.5,-24),
@@ -531,22 +576,30 @@ function NeonHub:CreateWindow(cfg)
         BorderSizePixel=0, ZIndex=15, Parent=Gui,
     })
     New("UICorner", {CornerRadius=UDim.new(0,12), Parent=ToggleBtn})
-    New("UIStroke", {Color=T.Brd, Thickness=1.5, Parent=ToggleBtn})
+    local tbStroke = New("UIStroke", {Color=T.Brd, Thickness=1.5, Parent=ToggleBtn})
+    RegisterThemeProp(ToggleBtn, "BackgroundColor3", "BG")
+    RegisterThemeProp(tbStroke,  "Color",            "Brd")
     MakeDraggable(ToggleBtn)
+    _ToggleBtn = ToggleBtn
 
-    if cfg.ToggleImageId ~= "" then
-        New("ImageLabel", {
-            Image="rbxassetid://"..cfg.ToggleImageId,
-            Size=UDim2.fromScale(0.7,0.7), Position=UDim2.fromScale(0.15,0.15),
+    -- Imagem do botão toggle (Minimize_button_image_id)
+    local toggleImgLbl = nil
+    local toggleTextLbl = nil
+    if LibConfig.Minimize_button_image_id ~= "" then
+        toggleImgLbl = New("ImageLabel", {
+            Image="rbxassetid://"..LibConfig.Minimize_button_image_id,
+            Size=UDim2.fromScale(0.75,0.75), Position=UDim2.fromScale(0.125,0.125),
             BackgroundTransparency=1, ZIndex=16, Parent=ToggleBtn,
         })
     else
-        New("TextLabel", {
+        toggleTextLbl = New("TextLabel", {
             Text="☰", Font=Enum.Font.GothamBold, TextSize=22,
             TextColor3=T.Tx, BackgroundTransparency=1,
             Size=UDim2.fromScale(1,1), ZIndex=16, Parent=ToggleBtn,
         })
+        RegisterThemeProp(toggleTextLbl, "TextColor3", "Tx")
     end
+    _ToggleImgLbl = toggleImgLbl
 
     local function ToggleWindow()
         IsOpen = not IsOpen
@@ -567,12 +620,11 @@ function NeonHub:CreateWindow(cfg)
     --  ADD TAB
     -- ══════════════════════════════════════════════════════════
     function Win:AddTab(name, icon)
-        local T  = CurrentTheme
+        local T   = CurrentTheme
         local Tab = { Name=name, _order=0 }
 
-        -- Sidebar button
         local iconTxt = icon and (icon.."  ") or "   "
-        local TabBtn = New("TextButton", {
+        local TabBtn  = New("TextButton", {
             Text= iconTxt .. name,
             Font=Enum.Font.GothamSemibold, TextSize=13,
             TextColor3=T.Sub, BackgroundColor3=T.El,
@@ -584,7 +636,6 @@ function NeonHub:CreateWindow(cfg)
         New("UICorner", {CornerRadius=UDim.new(0,8), Parent=TabBtn})
         New("UIPadding", {PaddingLeft=UDim.new(0,10), Parent=TabBtn})
 
-        -- Content ScrollFrame
         local TabFrame = New("ScrollingFrame", {
             Size=UDim2.fromScale(1,1), BackgroundTransparency=1,
             ScrollBarThickness=3, ScrollBarImageColor3=T.Acc,
@@ -598,7 +649,6 @@ function NeonHub:CreateWindow(cfg)
             Parent=TabFrame,
         })
 
-        -- Tab header labels
         New("TextLabel", {
             Text=name, Font=Enum.Font.GothamBold, TextSize=18,
             TextColor3=T.Tx, BackgroundTransparency=1,
@@ -612,21 +662,19 @@ function NeonHub:CreateWindow(cfg)
             TextXAlignment=Enum.TextXAlignment.Left, Parent=TabFrame,
         })
 
-        table.insert(Win.Tabs,     Tab)
+        table.insert(Win.Tabs,       Tab)
         table.insert(Win._tabFrames, TabFrame)
         table.insert(Win._tabBtns,   TabBtn)
 
-        -- Switch logic
         TabBtn.MouseButton1Click:Connect(function()
             for i, f in ipairs(Win._tabFrames) do
                 f.Visible = false
-                Tween(Win._tabBtns[i], {BackgroundTransparency=1, TextColor3=T.Sub}, 0.12)
+                Tween(Win._tabBtns[i], {BackgroundTransparency=1, TextColor3=CurrentTheme.Sub}, 0.12)
             end
             TabFrame.Visible = true
-            Tween(TabBtn, {BackgroundTransparency=0.8, TextColor3=T.Tx}, 0.12)
+            Tween(TabBtn, {BackgroundTransparency=0.8, TextColor3=CurrentTheme.Tx}, 0.12)
         end)
 
-        -- Auto-select first
         if #Win.Tabs == 1 then
             TabFrame.Visible = true
             TabBtn.BackgroundTransparency = 0.8
@@ -644,6 +692,7 @@ function NeonHub:CreateWindow(cfg)
         end
 
         local function Card(h, noStroke)
+            local T = CurrentTheme
             local c = New("Frame", {
                 Size=UDim2.new(1,0,0,h or 50),
                 BackgroundColor3=T.El,
@@ -653,8 +702,10 @@ function NeonHub:CreateWindow(cfg)
             })
             New("UICorner", {CornerRadius=UDim.new(0,9), Parent=c})
             if not noStroke then
-                New("UIStroke", {Color=T.Brd, Thickness=1, Parent=c})
+                local s = New("UIStroke", {Color=T.Brd, Thickness=1, Parent=c})
+                RegisterThemeProp(s, "Color", "Brd")
             end
+            RegisterThemeProp(c, "BackgroundColor3", "El")
             return c
         end
 
@@ -672,7 +723,7 @@ function NeonHub:CreateWindow(cfg)
 
             New("TextLabel", {
                 Text=cfg.Name, Font=Enum.Font.GothamSemibold, TextSize=13,
-                TextColor3=T.Tx, BackgroundTransparency=1,
+                TextColor3=CurrentTheme.Tx, BackgroundTransparency=1,
                 Size=UDim2.new(1,-70,1,0), Position=UDim2.fromOffset(12,0),
                 TextXAlignment=Enum.TextXAlignment.Left, Parent=card,
             })
@@ -680,7 +731,7 @@ function NeonHub:CreateWindow(cfg)
             local swBg = New("Frame", {
                 Size=UDim2.fromOffset(50,26),
                 Position=UDim2.new(1,-62,0.5,-13),
-                BackgroundColor3=val and T.Acc or T.Brd,
+                BackgroundColor3=val and CurrentTheme.Acc or CurrentTheme.Brd,
                 BorderSizePixel=0, Parent=card,
             })
             New("UICorner", {CornerRadius=UDim.new(1,0), Parent=swBg})
@@ -697,8 +748,8 @@ function NeonHub:CreateWindow(cfg)
             })
             btn.MouseButton1Click:Connect(function()
                 val = not val
-                Tween(swBg,  {BackgroundColor3=val and T.Acc or T.Brd}, 0.15)
-                Tween(knob,  {Position=val and UDim2.fromOffset(26,3) or UDim2.fromOffset(3,3)}, 0.15)
+                Tween(swBg, {BackgroundColor3=val and CurrentTheme.Acc or CurrentTheme.Brd}, 0.15)
+                Tween(knob, {Position=val and UDim2.fromOffset(26,3) or UDim2.fromOffset(3,3)}, 0.15)
                 cfg.Callback(val)
             end)
 
@@ -708,7 +759,7 @@ function NeonHub:CreateWindow(cfg)
                     Get=function() return val end,
                     Set=function(v)
                         val = v
-                        Tween(swBg,  {BackgroundColor3=val and T.Acc or T.Brd}, 0.15)
+                        Tween(swBg,  {BackgroundColor3=val and CurrentTheme.Acc or CurrentTheme.Brd}, 0.15)
                         Tween(knob,  {Position=val and UDim2.fromOffset(26,3) or UDim2.fromOffset(3,3)}, 0.15)
                         cfg.Callback(val)
                     end,
@@ -733,28 +784,28 @@ function NeonHub:CreateWindow(cfg)
             local val  = cfg.Default
             local card = Card(70)
 
-            local nameLbl = New("TextLabel", {
+            New("TextLabel", {
                 Text=cfg.Name, Font=Enum.Font.GothamSemibold, TextSize=13,
-                TextColor3=T.Tx, BackgroundTransparency=1,
+                TextColor3=CurrentTheme.Tx, BackgroundTransparency=1,
                 Size=UDim2.new(0.65,0,0,24), Position=UDim2.fromOffset(12,6),
                 TextXAlignment=Enum.TextXAlignment.Left, Parent=card,
             })
             local valLbl = New("TextLabel", {
                 Text=tostring(val)..cfg.Suffix, Font=Enum.Font.GothamBold, TextSize=13,
-                TextColor3=T.Acc, BackgroundTransparency=1,
+                TextColor3=CurrentTheme.Acc, BackgroundTransparency=1,
                 Size=UDim2.new(0.35,-12,0,24), Position=UDim2.new(0.65,0,0,6),
                 TextXAlignment=Enum.TextXAlignment.Right, Parent=card,
             })
 
             local trackBg = New("Frame", {
                 Size=UDim2.new(1,-24,0,8), Position=UDim2.fromOffset(12,42),
-                BackgroundColor3=T.Brd, BorderSizePixel=0, Parent=card,
+                BackgroundColor3=CurrentTheme.Brd, BorderSizePixel=0, Parent=card,
             })
             New("UICorner", {CornerRadius=UDim.new(1,0), Parent=trackBg})
 
-            local p0 = (val-cfg.Min)/(cfg.Max-cfg.Min)
+            local p0   = (val-cfg.Min)/(cfg.Max-cfg.Min)
             local fill = New("Frame", {
-                Size=UDim2.new(p0,0,1,0), BackgroundColor3=T.Sl, BorderSizePixel=0, Parent=trackBg,
+                Size=UDim2.new(p0,0,1,0), BackgroundColor3=CurrentTheme.Sl, BorderSizePixel=0, Parent=trackBg,
             })
             New("UICorner", {CornerRadius=UDim.new(1,0), Parent=fill})
 
@@ -763,16 +814,19 @@ function NeonHub:CreateWindow(cfg)
                 BackgroundColor3=Color3.fromRGB(255,255,255), BorderSizePixel=0, ZIndex=2, Parent=trackBg,
             })
             New("UICorner", {CornerRadius=UDim.new(1,0), Parent=knob})
-            New("UIStroke", {Color=T.Sl, Thickness=2, Parent=knob})
+            local kStroke = New("UIStroke", {Color=CurrentTheme.Sl, Thickness=2, Parent=knob})
+            RegisterThemeProp(kStroke, "Color", "Sl")
+            RegisterThemeProp(fill,    "BackgroundColor3", "Sl")
+            RegisterThemeProp(trackBg, "BackgroundColor3", "Brd")
 
             local function UpdateSlider(inp)
                 local relX = math.clamp(inp.Position.X - trackBg.AbsolutePosition.X, 0, trackBg.AbsoluteSize.X)
                 local p    = relX / trackBg.AbsoluteSize.X
                 val = math.clamp(math.round((cfg.Min+(cfg.Max-cfg.Min)*p)/cfg.Increment)*cfg.Increment, cfg.Min, cfg.Max)
                 local np = (val-cfg.Min)/(cfg.Max-cfg.Min)
-                fill.Size = UDim2.new(np,0,1,0)
+                fill.Size     = UDim2.new(np,0,1,0)
                 knob.Position = UDim2.new(np,0,0.5,-10)
-                valLbl.Text = tostring(val)..cfg.Suffix
+                valLbl.Text   = tostring(val)..cfg.Suffix
                 cfg.Callback(val)
             end
 
@@ -789,9 +843,7 @@ function NeonHub:CreateWindow(cfg)
                 end
             end)
             UserInputService.InputEnded:Connect(function(inp)
-                if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
-                    dragging=false
-                end
+                if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then dragging=false end
             end)
 
             if cfg.Flag then
@@ -820,19 +872,21 @@ function NeonHub:CreateWindow(cfg)
             local card = Card(46)
             local btn  = New("TextButton", {
                 Text=cfg.Name, Font=Enum.Font.GothamSemibold, TextSize=13,
-                TextColor3=T.Tx, BackgroundColor3=T.Btn, BorderSizePixel=0,
+                TextColor3=CurrentTheme.Tx, BackgroundColor3=CurrentTheme.Btn, BorderSizePixel=0,
                 Size=UDim2.new(1,-24,0,32), Position=UDim2.fromOffset(12,7), Parent=card,
             })
             New("UICorner", {CornerRadius=UDim.new(0,8), Parent=btn})
+            RegisterThemeProp(btn, "BackgroundColor3", "Btn")
+            RegisterThemeProp(btn, "TextColor3",       "Tx")
             btn.MouseButton1Click:Connect(function()
                 cfg.Callback()
-                Tween(btn,{BackgroundColor3=T.Acc},0.08)
-                task.delay(0.22, function() Tween(btn,{BackgroundColor3=T.Btn},0.12) end)
+                Tween(btn,{BackgroundColor3=CurrentTheme.Acc},0.08)
+                task.delay(0.22, function() Tween(btn,{BackgroundColor3=CurrentTheme.Btn},0.12) end)
             end)
         end
 
         -- ──────────────────────────────────────────────────────
-        --  ELEMENT 4: DROPDOWN (with auto-scroll)
+        --  ELEMENT 4: DROPDOWN (com scroll automático)
         -- ──────────────────────────────────────────────────────
         function Tab:AddDropdown(cfg)
             cfg = cfg or {}
@@ -848,26 +902,28 @@ function NeonHub:CreateWindow(cfg)
 
             local header = New("Frame", {
                 Size=UDim2.new(1,-24,0,34), Position=UDim2.fromOffset(12,6),
-                BackgroundColor3=T.Btn, BorderSizePixel=0, Parent=card,
+                BackgroundColor3=CurrentTheme.Btn, BorderSizePixel=0, Parent=card,
             })
             New("UICorner", {CornerRadius=UDim.new(0,8), Parent=header})
-            New("UIStroke", {Color=T.Brd, Thickness=1, Parent=header})
+            local hStroke = New("UIStroke", {Color=CurrentTheme.Brd, Thickness=1, Parent=header})
+            RegisterThemeProp(header,  "BackgroundColor3", "Btn")
+            RegisterThemeProp(hStroke, "Color",            "Brd")
 
             New("TextLabel", {
                 Text=cfg.Name, Font=Enum.Font.GothamSemibold, TextSize=12,
-                TextColor3=T.Sub, BackgroundTransparency=1,
+                TextColor3=CurrentTheme.Sub, BackgroundTransparency=1,
                 Size=UDim2.new(0.45,0,1,0), Position=UDim2.fromOffset(10,0),
                 TextXAlignment=Enum.TextXAlignment.Left, Parent=header,
             })
             local valLbl = New("TextLabel", {
                 Text=val, Font=Enum.Font.GothamSemibold, TextSize=12,
-                TextColor3=T.Tx, BackgroundTransparency=1,
+                TextColor3=CurrentTheme.Tx, BackgroundTransparency=1,
                 Size=UDim2.new(0.5,0,1,0), Position=UDim2.new(0.45,0,0,0),
                 TextXAlignment=Enum.TextXAlignment.Right, Parent=header,
             })
             local arrow = New("TextLabel", {
                 Text="▾", Font=Enum.Font.GothamBold, TextSize=14,
-                TextColor3=T.Sub, BackgroundTransparency=1,
+                TextColor3=CurrentTheme.Sub, BackgroundTransparency=1,
                 Size=UDim2.fromOffset(24,34), Position=UDim2.new(1,-24,0,0), Parent=header,
             })
 
@@ -878,19 +934,21 @@ function NeonHub:CreateWindow(cfg)
             local dropFrame = New("ScrollingFrame", {
                 Size=UDim2.new(1,-24,0,dropH),
                 Position=UDim2.new(0,12,0,46),
-                BackgroundColor3=T.Btn, BorderSizePixel=0,
-                ScrollBarThickness=3, ScrollBarImageColor3=T.Acc,
+                BackgroundColor3=CurrentTheme.Btn, BorderSizePixel=0,
+                ScrollBarThickness=3, ScrollBarImageColor3=CurrentTheme.Acc,
                 CanvasSize=UDim2.new(0,0,0,#cfg.Options*itemH),
                 Visible=false, ZIndex=20, Parent=card,
             })
             New("UICorner", {CornerRadius=UDim.new(0,8), Parent=dropFrame})
-            New("UIStroke", {Color=T.Brd, Thickness=1, Parent=dropFrame})
+            local dfStroke = New("UIStroke", {Color=CurrentTheme.Brd, Thickness=1, Parent=dropFrame})
             New("UIListLayout", {Padding=UDim.new(0,0), Parent=dropFrame})
+            RegisterThemeProp(dropFrame, "BackgroundColor3", "Btn")
+            RegisterThemeProp(dfStroke,  "Color",            "Brd")
 
             for _, opt in ipairs(cfg.Options) do
                 local optBtn = New("TextButton", {
                     Text="  "..opt, Font=Enum.Font.Gotham, TextSize=12,
-                    TextColor3=opt==val and T.Acc or T.Tx,
+                    TextColor3=opt==val and CurrentTheme.Acc or CurrentTheme.Tx,
                     BackgroundTransparency=1,
                     Size=UDim2.new(1,0,0,itemH), ZIndex=21, Parent=dropFrame,
                     TextXAlignment=Enum.TextXAlignment.Left,
@@ -903,10 +961,9 @@ function NeonHub:CreateWindow(cfg)
                     card.Size    = UDim2.new(1,0,0,46)
                     Tween(arrow, {Rotation=0}, 0.12)
                     cfg.Callback(val)
-                    -- Update colors
                     for _, ch in ipairs(dropFrame:GetChildren()) do
                         if ch:IsA("TextButton") then
-                            ch.TextColor3 = ch.Text:sub(3)==opt and T.Acc or T.Tx
+                            ch.TextColor3 = (ch.Text:sub(3)==opt) and CurrentTheme.Acc or CurrentTheme.Tx
                         end
                     end
                 end)
@@ -938,7 +995,7 @@ function NeonHub:CreateWindow(cfg)
         end
 
         -- ──────────────────────────────────────────────────────
-        --  ELEMENT 5: MULTI-DROPDOWN (auto-scroll)
+        --  ELEMENT 5: MULTI-DROPDOWN
         -- ──────────────────────────────────────────────────────
         function Tab:AddMultiDropdown(cfg)
             cfg = cfg or {}
@@ -955,25 +1012,25 @@ function NeonHub:CreateWindow(cfg)
 
             local header = New("Frame", {
                 Size=UDim2.new(1,-24,0,34), Position=UDim2.fromOffset(12,6),
-                BackgroundColor3=T.Btn, BorderSizePixel=0, Parent=card,
+                BackgroundColor3=CurrentTheme.Btn, BorderSizePixel=0, Parent=card,
             })
             New("UICorner", {CornerRadius=UDim.new(0,8), Parent=header})
-            New("UIStroke", {Color=T.Brd, Thickness=1, Parent=header})
+            New("UIStroke", {Color=CurrentTheme.Brd, Thickness=1, Parent=header})
             New("TextLabel", {
                 Text=cfg.Name, Font=Enum.Font.GothamSemibold, TextSize=12,
-                TextColor3=T.Sub, BackgroundTransparency=1,
+                TextColor3=CurrentTheme.Sub, BackgroundTransparency=1,
                 Size=UDim2.new(0.45,0,1,0), Position=UDim2.fromOffset(10,0),
                 TextXAlignment=Enum.TextXAlignment.Left, Parent=header,
             })
             local cntLbl = New("TextLabel", {
                 Text="0 selected", Font=Enum.Font.GothamSemibold, TextSize=12,
-                TextColor3=T.Tx, BackgroundTransparency=1,
+                TextColor3=CurrentTheme.Tx, BackgroundTransparency=1,
                 Size=UDim2.new(0.5,0,1,0), Position=UDim2.new(0.45,0,0,0),
                 TextXAlignment=Enum.TextXAlignment.Right, Parent=header,
             })
             local arrow = New("TextLabel", {
                 Text="▾", Font=Enum.Font.GothamBold, TextSize=14,
-                TextColor3=T.Sub, BackgroundTransparency=1,
+                TextColor3=CurrentTheme.Sub, BackgroundTransparency=1,
                 Size=UDim2.fromOffset(24,34), Position=UDim2.new(1,-24,0,0), Parent=header,
             })
 
@@ -984,13 +1041,13 @@ function NeonHub:CreateWindow(cfg)
             local dropFrame = New("ScrollingFrame", {
                 Size=UDim2.new(1,-24,0,dropH),
                 Position=UDim2.new(0,12,0,46),
-                BackgroundColor3=T.Btn, BorderSizePixel=0,
-                ScrollBarThickness=3, ScrollBarImageColor3=T.Acc,
+                BackgroundColor3=CurrentTheme.Btn, BorderSizePixel=0,
+                ScrollBarThickness=3, ScrollBarImageColor3=CurrentTheme.Acc,
                 CanvasSize=UDim2.new(0,0,0,#cfg.Options*itemH),
                 Visible=false, ZIndex=20, Parent=card,
             })
             New("UICorner", {CornerRadius=UDim.new(0,8), Parent=dropFrame})
-            New("UIStroke", {Color=T.Brd, Thickness=1, Parent=dropFrame})
+            New("UIStroke", {Color=CurrentTheme.Brd, Thickness=1, Parent=dropFrame})
             New("UIListLayout", {Padding=UDim.new(0,0), Parent=dropFrame})
 
             local function UpdateCount()
@@ -1006,13 +1063,13 @@ function NeonHub:CreateWindow(cfg)
                 })
                 New("TextLabel", {
                     Text="  "..opt, Font=Enum.Font.Gotham, TextSize=12,
-                    TextColor3=T.Tx, BackgroundTransparency=1,
+                    TextColor3=CurrentTheme.Tx, BackgroundTransparency=1,
                     Size=UDim2.new(1,-42,1,0), TextXAlignment=Enum.TextXAlignment.Left,
                     ZIndex=22, Parent=row,
                 })
                 local chkBg = New("Frame", {
                     Size=UDim2.fromOffset(20,20), Position=UDim2.new(1,-30,0.5,-10),
-                    BackgroundColor3=selected[opt] and T.Acc or T.Brd,
+                    BackgroundColor3=selected[opt] and CurrentTheme.Acc or CurrentTheme.Brd,
                     BorderSizePixel=0, ZIndex=22, Parent=row,
                 })
                 New("UICorner", {CornerRadius=UDim.new(0,4), Parent=chkBg})
@@ -1027,7 +1084,7 @@ function NeonHub:CreateWindow(cfg)
                 })
                 rb.MouseButton1Click:Connect(function()
                     selected[opt] = not selected[opt]
-                    chkBg.BackgroundColor3 = selected[opt] and T.Acc or T.Brd
+                    chkBg.BackgroundColor3 = selected[opt] and CurrentTheme.Acc or CurrentTheme.Brd
                     chk.Visible = selected[opt]==true
                     UpdateCount()
                     local sel={}
@@ -1059,7 +1116,7 @@ function NeonHub:CreateWindow(cfg)
                         selected={}
                         for _,k in ipairs(v) do selected[k]=true end
                         for opt, cbs in pairs(checkboxes) do
-                            cbs.bg.BackgroundColor3=selected[opt] and T.Acc or T.Brd
+                            cbs.bg.BackgroundColor3=selected[opt] and CurrentTheme.Acc or CurrentTheme.Brd
                             cbs.mark.Visible=selected[opt]==true
                         end
                         UpdateCount()
@@ -1088,21 +1145,24 @@ function NeonHub:CreateWindow(cfg)
 
             New("TextLabel", {
                 Text=cfg.Name, Font=Enum.Font.GothamSemibold, TextSize=13,
-                TextColor3=T.Tx, BackgroundTransparency=1,
+                TextColor3=CurrentTheme.Tx, BackgroundTransparency=1,
                 Size=UDim2.new(1,0,0,22), Position=UDim2.fromOffset(12,6),
                 TextXAlignment=Enum.TextXAlignment.Left, Parent=card,
             })
             local box = New("TextBox", {
                 PlaceholderText=cfg.Placeholder, Text=val,
                 Font=Enum.Font.Gotham, TextSize=13,
-                TextColor3=T.Tx, PlaceholderColor3=T.Sub,
-                BackgroundColor3=T.BG, BorderSizePixel=0,
+                TextColor3=CurrentTheme.Tx, PlaceholderColor3=CurrentTheme.Sub,
+                BackgroundColor3=CurrentTheme.BG, BorderSizePixel=0,
                 Size=UDim2.new(1,-24,0,32), Position=UDim2.fromOffset(12,32),
                 ClearTextOnFocus=false, Parent=card,
             })
             New("UICorner",{CornerRadius=UDim.new(0,7), Parent=box})
-            New("UIStroke", {Color=T.Brd, Thickness=1, Parent=box})
+            local bStroke = New("UIStroke", {Color=CurrentTheme.Brd, Thickness=1, Parent=box})
             New("UIPadding", {PaddingLeft=UDim.new(0,8), Parent=box})
+            RegisterThemeProp(box,     "BackgroundColor3", "BG")
+            RegisterThemeProp(box,     "TextColor3",       "Tx")
+            RegisterThemeProp(bStroke, "Color",            "Brd")
             box.FocusLost:Connect(function() val=box.Text; cfg.Callback(val) end)
 
             if cfg.Flag then
@@ -1125,7 +1185,7 @@ function NeonHub:CreateWindow(cfg)
             card.BackgroundTransparency = 0.7
             New("TextLabel", {
                 Text=cfg.Text, Font=Enum.Font.GothamSemibold, TextSize=12,
-                TextColor3=T.Sub, BackgroundTransparency=1,
+                TextColor3=CurrentTheme.Sub, BackgroundTransparency=1,
                 Size=UDim2.fromScale(1,1), TextXAlignment=Enum.TextXAlignment.Left,
                 Parent=card,
             })
@@ -1148,7 +1208,7 @@ function NeonHub:CreateWindow(cfg)
 
             New("TextLabel", {
                 Text=cfg.Name, Font=Enum.Font.GothamSemibold, TextSize=13,
-                TextColor3=T.Tx, BackgroundTransparency=1,
+                TextColor3=CurrentTheme.Tx, BackgroundTransparency=1,
                 Size=UDim2.new(0.7,0,0,24), Position=UDim2.fromOffset(12,4),
                 TextXAlignment=Enum.TextXAlignment.Left, Parent=card,
             })
@@ -1157,9 +1217,9 @@ function NeonHub:CreateWindow(cfg)
                 BackgroundColor3=cfg.Default, BorderSizePixel=0, Parent=card,
             })
             New("UICorner", {CornerRadius=UDim.new(0,6), Parent=preview})
-            New("UIStroke", {Color=T.Brd, Thickness=1, Parent=preview})
+            New("UIStroke", {Color=CurrentTheme.Brd, Thickness=1, Parent=preview})
 
-            local labels = {"R","G","B"}
+            local labels  = {"R","G","B"}
             local getters = {function() return r end, function() return g end, function() return b end}
             local setters = {function(v) r=v end, function(v) g=v end, function(v) b=v end}
             local colors  = {Color3.fromRGB(220,60,60), Color3.fromRGB(60,200,60), Color3.fromRGB(60,100,220)}
@@ -1173,7 +1233,7 @@ function NeonHub:CreateWindow(cfg)
                 })
                 local tBg = New("Frame", {
                     Size=UDim2.new(1,-60,0,6), Position=UDim2.fromOffset(28,y+11),
-                    BackgroundColor3=T.Brd, BorderSizePixel=0, Parent=card,
+                    BackgroundColor3=CurrentTheme.Brd, BorderSizePixel=0, Parent=card,
                 })
                 New("UICorner", {CornerRadius=UDim.new(1,0), Parent=tBg})
                 local fill = New("Frame", {
@@ -1183,10 +1243,12 @@ function NeonHub:CreateWindow(cfg)
                 New("UICorner", {CornerRadius=UDim.new(1,0), Parent=fill})
                 local vLbl = New("TextLabel", {
                     Text=tostring(getters[i]()), Font=Enum.Font.Gotham, TextSize=11,
-                    TextColor3=T.Sub, BackgroundTransparency=1,
+                    TextColor3=CurrentTheme.Sub, BackgroundTransparency=1,
                     Size=UDim2.fromOffset(28,18), Position=UDim2.new(1,-30,0,y+7),
                     TextXAlignment=Enum.TextXAlignment.Right, Parent=card,
                 })
+                RegisterThemeProp(tBg,  "BackgroundColor3", "Brd")
+                RegisterThemeProp(vLbl, "TextColor3",       "Sub")
                 local dragging=false
                 local sb=New("TextButton",{Text="",BackgroundTransparency=1,Size=UDim2.fromScale(1,1),ZIndex=3,Parent=tBg})
                 sb.InputBegan:Connect(function(inp)
@@ -1231,32 +1293,34 @@ function NeonHub:CreateWindow(cfg)
             cfg.Default  = cfg.Default  or Enum.KeyCode.Unknown
             cfg.Callback = cfg.Callback or function() end
 
-            local val      = cfg.Default
-            local listening= false
-            local card     = Card(48)
+            local val       = cfg.Default
+            local listening = false
+            local card      = Card(48)
 
             New("TextLabel", {
                 Text=cfg.Name, Font=Enum.Font.GothamSemibold, TextSize=13,
-                TextColor3=T.Tx, BackgroundTransparency=1,
+                TextColor3=CurrentTheme.Tx, BackgroundTransparency=1,
                 Size=UDim2.new(0.55,0,1,0), Position=UDim2.fromOffset(12,0),
                 TextXAlignment=Enum.TextXAlignment.Left, Parent=card,
             })
             local keyBtn = New("TextButton", {
                 Text=val==Enum.KeyCode.Unknown and "[ None ]" or "[ "..val.Name.." ]",
                 Font=Enum.Font.GothamSemibold, TextSize=12,
-                TextColor3=T.Tx, BackgroundColor3=T.Btn, BorderSizePixel=0,
+                TextColor3=CurrentTheme.Tx, BackgroundColor3=CurrentTheme.Btn, BorderSizePixel=0,
                 Size=UDim2.fromOffset(90,28), Position=UDim2.new(1,-102,0.5,-14), Parent=card,
             })
             New("UICorner", {CornerRadius=UDim.new(0,6), Parent=keyBtn})
+            RegisterThemeProp(keyBtn, "BackgroundColor3", "Btn")
+            RegisterThemeProp(keyBtn, "TextColor3",       "Tx")
 
             keyBtn.MouseButton1Click:Connect(function()
-                listening=true; keyBtn.Text="[ ... ]"; keyBtn.TextColor3=T.Acc
+                listening=true; keyBtn.Text="[ ... ]"; keyBtn.TextColor3=CurrentTheme.Acc
             end)
             UserInputService.InputBegan:Connect(function(inp, gp)
                 if listening and not gp and inp.UserInputType==Enum.UserInputType.Keyboard then
                     val=inp.KeyCode
                     keyBtn.Text="[ "..val.Name.." ]"
-                    keyBtn.TextColor3=T.Tx; listening=false; cfg.Callback(val)
+                    keyBtn.TextColor3=CurrentTheme.Tx; listening=false; cfg.Callback(val)
                 end
             end)
 
@@ -1282,13 +1346,13 @@ function NeonHub:CreateWindow(cfg)
                 card.Size = UDim2.new(1,0,0,30)
                 New("TextLabel", {
                     Text=cfg.Text, Font=Enum.Font.GothamSemibold, TextSize=11,
-                    TextColor3=T.Sub, BackgroundTransparency=1,
+                    TextColor3=CurrentTheme.Sub, BackgroundTransparency=1,
                     Size=UDim2.fromScale(1,1), TextXAlignment=Enum.TextXAlignment.Center, Parent=card,
                 })
             end
             New("Frame", {
                 Size=UDim2.new(1,0,0,1), Position=UDim2.fromScale(0,0.5),
-                BackgroundColor3=T.Brd, BorderSizePixel=0, Parent=card,
+                BackgroundColor3=CurrentTheme.Brd, BorderSizePixel=0, Parent=card,
             })
         end
 
@@ -1302,13 +1366,13 @@ function NeonHub:CreateWindow(cfg)
             local card  = Card(72)
             New("TextLabel", {
                 Text=cfg.Title, Font=Enum.Font.GothamBold, TextSize=13,
-                TextColor3=T.Tx, BackgroundTransparency=1,
+                TextColor3=CurrentTheme.Tx, BackgroundTransparency=1,
                 Size=UDim2.new(1,-24,0,22), Position=UDim2.fromOffset(12,6),
                 TextXAlignment=Enum.TextXAlignment.Left, Parent=card,
             })
             New("TextLabel", {
                 Text=cfg.Content, Font=Enum.Font.Gotham, TextSize=12,
-                TextColor3=T.Sub, BackgroundTransparency=1,
+                TextColor3=CurrentTheme.Sub, BackgroundTransparency=1,
                 Size=UDim2.new(1,-24,0,38), Position=UDim2.fromOffset(12,28),
                 TextXAlignment=Enum.TextXAlignment.Left, TextYAlignment=Enum.TextYAlignment.Top,
                 TextWrapped=true, Parent=card,
@@ -1333,20 +1397,22 @@ function NeonHub:CreateWindow(cfg)
             end
             New("TextLabel", {
                 Text=cfg.Name, Font=Enum.Font.GothamSemibold, TextSize=13,
-                TextColor3=T.Tx, BackgroundTransparency=1,
+                TextColor3=CurrentTheme.Tx, BackgroundTransparency=1,
                 Size=UDim2.new(1,-120,1,0), Position=UDim2.fromOffset(cfg.ImageId~="" and 52 or 12,0),
                 TextXAlignment=Enum.TextXAlignment.Left, Parent=card,
             })
             local btn = New("TextButton", {
                 Text="▶  Run", Font=Enum.Font.GothamBold, TextSize=12,
-                TextColor3=T.Acc, BackgroundColor3=T.Btn, BorderSizePixel=0,
+                TextColor3=CurrentTheme.Acc, BackgroundColor3=CurrentTheme.Btn, BorderSizePixel=0,
                 Size=UDim2.fromOffset(68,30), Position=UDim2.new(1,-80,0.5,-15), Parent=card,
             })
             New("UICorner", {CornerRadius=UDim.new(0,8), Parent=btn})
+            RegisterThemeProp(btn, "BackgroundColor3", "Btn")
+            RegisterThemeProp(btn, "TextColor3",       "Acc")
             btn.MouseButton1Click:Connect(function()
                 cfg.Callback()
-                Tween(btn,{BackgroundColor3=T.Acc},0.08)
-                task.delay(0.2, function() Tween(btn,{BackgroundColor3=T.Btn},0.12) end)
+                Tween(btn,{BackgroundColor3=CurrentTheme.Acc},0.08)
+                task.delay(0.2, function() Tween(btn,{BackgroundColor3=CurrentTheme.Btn},0.12) end)
             end)
         end
 
@@ -1355,34 +1421,35 @@ function NeonHub:CreateWindow(cfg)
         -- ──────────────────────────────────────────────────────
         function Tab:AddProgressBar(cfg)
             cfg = cfg or {}
-            cfg.Name     = cfg.Name     or "Progress"
-            cfg.Value    = cfg.Value    or 0
-            cfg.Max      = cfg.Max      or 100
-            cfg.Color    = cfg.Color    or T.Acc
-            local val    = cfg.Value
-            local card   = Card(56)
+            cfg.Name  = cfg.Name  or "Progress"
+            cfg.Value = cfg.Value or 0
+            cfg.Max   = cfg.Max   or 100
+            cfg.Color = cfg.Color or CurrentTheme.Acc
+            local val = cfg.Value
+            local card = Card(56)
 
             New("TextLabel", {
                 Text=cfg.Name, Font=Enum.Font.GothamSemibold, TextSize=13,
-                TextColor3=T.Tx, BackgroundTransparency=1,
+                TextColor3=CurrentTheme.Tx, BackgroundTransparency=1,
                 Size=UDim2.new(0.7,0,0,22), Position=UDim2.fromOffset(12,6),
                 TextXAlignment=Enum.TextXAlignment.Left, Parent=card,
             })
             local pLbl = New("TextLabel", {
                 Text=math.floor(val/cfg.Max*100).."%", Font=Enum.Font.GothamBold, TextSize=13,
-                TextColor3=T.Acc, BackgroundTransparency=1,
+                TextColor3=CurrentTheme.Acc, BackgroundTransparency=1,
                 Size=UDim2.new(0.3,-12,0,22), Position=UDim2.new(0.7,0,0,6),
                 TextXAlignment=Enum.TextXAlignment.Right, Parent=card,
             })
             local tBg = New("Frame", {
                 Size=UDim2.new(1,-24,0,10), Position=UDim2.fromOffset(12,36),
-                BackgroundColor3=T.Brd, BorderSizePixel=0, Parent=card,
+                BackgroundColor3=CurrentTheme.Brd, BorderSizePixel=0, Parent=card,
             })
             New("UICorner", {CornerRadius=UDim.new(1,0), Parent=tBg})
             local fill = New("Frame", {
                 Size=UDim2.new(val/cfg.Max,0,1,0), BackgroundColor3=cfg.Color, BorderSizePixel=0, Parent=tBg,
             })
             New("UICorner", {CornerRadius=UDim.new(1,0), Parent=fill})
+            RegisterThemeProp(tBg, "BackgroundColor3", "Brd")
 
             return {
                 Set=function(v)
@@ -1410,30 +1477,39 @@ function NeonHub:CreateWindow(cfg)
 
             New("TextLabel", {
                 Text=cfg.Name, Font=Enum.Font.GothamSemibold, TextSize=13,
-                TextColor3=T.Tx, BackgroundTransparency=1,
+                TextColor3=CurrentTheme.Tx, BackgroundTransparency=1,
                 Size=UDim2.new(0.45,0,1,0), Position=UDim2.fromOffset(12,0),
                 TextXAlignment=Enum.TextXAlignment.Left, Parent=card,
             })
             local minus = New("TextButton", {
                 Text="−", Font=Enum.Font.GothamBold, TextSize=20,
-                TextColor3=T.Tx, BackgroundColor3=T.Btn, BorderSizePixel=0,
+                TextColor3=CurrentTheme.Tx, BackgroundColor3=CurrentTheme.Btn, BorderSizePixel=0,
                 Size=UDim2.fromOffset(32,32), Position=UDim2.new(1,-120,0.5,-16), Parent=card,
             })
             New("UICorner", {CornerRadius=UDim.new(0,7), Parent=minus})
+            RegisterThemeProp(minus, "BackgroundColor3", "Btn")
+            RegisterThemeProp(minus, "TextColor3",       "Tx")
+
             local numBox = New("TextBox", {
                 Text=tostring(val), Font=Enum.Font.GothamBold, TextSize=14,
-                TextColor3=T.Tx, BackgroundColor3=T.BG, BorderSizePixel=0,
+                TextColor3=CurrentTheme.Tx, BackgroundColor3=CurrentTheme.BG, BorderSizePixel=0,
                 Size=UDim2.fromOffset(50,32), Position=UDim2.new(1,-84,0.5,-16),
                 TextXAlignment=Enum.TextXAlignment.Center, Parent=card,
             })
             New("UICorner", {CornerRadius=UDim.new(0,7), Parent=numBox})
-            New("UIStroke", {Color=T.Brd, Thickness=1, Parent=numBox})
+            local nbStroke = New("UIStroke", {Color=CurrentTheme.Brd, Thickness=1, Parent=numBox})
+            RegisterThemeProp(numBox,   "BackgroundColor3", "BG")
+            RegisterThemeProp(numBox,   "TextColor3",       "Tx")
+            RegisterThemeProp(nbStroke, "Color",            "Brd")
+
             local plus = New("TextButton", {
                 Text="+", Font=Enum.Font.GothamBold, TextSize=20,
-                TextColor3=T.Tx, BackgroundColor3=T.Btn, BorderSizePixel=0,
+                TextColor3=CurrentTheme.Tx, BackgroundColor3=CurrentTheme.Btn, BorderSizePixel=0,
                 Size=UDim2.fromOffset(32,32), Position=UDim2.new(1,-30,0.5,-16), Parent=card,
             })
             New("UICorner", {CornerRadius=UDim.new(0,7), Parent=plus})
+            RegisterThemeProp(plus, "BackgroundColor3", "Btn")
+            RegisterThemeProp(plus, "TextColor3",       "Tx")
 
             local function Update(v)
                 val=math.clamp(math.round(v/cfg.Increment)*cfg.Increment, cfg.Min, cfg.Max)
@@ -1459,11 +1535,12 @@ function NeonHub:CreateWindow(cfg)
             cfg = cfg or {}
             cfg.Name = cfg.Name or "Section"
             local card = Card(30, true)
-            card.BackgroundColor3 = T.Side
+            card.BackgroundColor3 = CurrentTheme.Side
             card.BackgroundTransparency = LibConfig.Transparency and 0.55 or 0.2
+            RegisterThemeProp(card, "BackgroundColor3", "Side")
             New("TextLabel", {
                 Text="  "..cfg.Name:upper(), Font=Enum.Font.GothamBold, TextSize=11,
-                TextColor3=T.Acc, BackgroundTransparency=1,
+                TextColor3=CurrentTheme.Acc, BackgroundTransparency=1,
                 Size=UDim2.fromScale(1,1), TextXAlignment=Enum.TextXAlignment.Left, Parent=card,
             })
         end
@@ -1473,40 +1550,54 @@ function NeonHub:CreateWindow(cfg)
 
     -- ══════════════════════════════════════════════════════════
     --  WIN:ADDCONFIG()
+    --  CORREÇÃO: o dropdown de tema chama ApplyTheme() em tempo real
     -- ══════════════════════════════════════════════════════════
     function Win:AddConfig()
-        local T      = CurrentTheme
         local cfgTab = self:AddTab("⚙ Config")
 
         cfgTab:AddSection({Name="Appearance"})
 
-        -- Transparency toggle
+        -- Transparência
         cfgTab:AddToggle({
             Name    = "UI Transparency (60%)",
             Default = LibConfig.Transparency,
             Callback = function(v)
                 LibConfig.Transparency = v
                 local tr = v and 0.4 or 0
-                MainFrame.BackgroundTransparency = tr
-                Sidebar.BackgroundTransparency   = tr
-                ToggleBtn.BackgroundTransparency  = tr
+                if _MainFrame  then _MainFrame.BackgroundTransparency  = tr end
+                if _Sidebar    then _Sidebar.BackgroundTransparency    = tr end
+                if _ToggleBtn  then _ToggleBtn.BackgroundTransparency  = tr end
             end,
         })
 
-        -- Theme dropdown
+        -- ── DROPDOWN DE TEMA (aplica imediatamente) ───────────
         cfgTab:AddDropdown({
             Name    = "Theme",
             Options = ThemeNames,
             Default = LibConfig.Theme,
-            Callback = function(v)
-                LibConfig.Theme = v
-                -- Store; will apply on next window creation
+            Callback = function(themeName)
+                ApplyTheme(themeName)
+
+                -- Atualiza transparency do fundo (depende do tema/BG)
+                local tr = LibConfig.Transparency and 0.4 or 0
+                if _MainFrame then
+                    _MainFrame.BackgroundTransparency = tr
+                end
+                if _Sidebar then
+                    _Sidebar.BackgroundTransparency = tr
+                end
+                if _ToggleBtn then
+                    _ToggleBtn.BackgroundTransparency = tr
+                end
+
+                -- Atualiza ScrollBars
+                local T = CurrentTheme
+                if SideList then SideList.ScrollBarImageColor3 = T.Acc end
             end,
         })
 
         cfgTab:AddSection({Name="Save & Load"})
 
-        -- Save name textbox
         cfgTab:AddTextBox({
             Name        = "Save Name",
             Placeholder = "MySave",
@@ -1514,7 +1605,6 @@ function NeonHub:CreateWindow(cfg)
             Callback    = function(v) LibConfig.SaveName = v end,
         })
 
-        -- Save button
         cfgTab:AddButton({
             Name = "💾  Save Current State",
             Callback = function()
@@ -1530,12 +1620,10 @@ function NeonHub:CreateWindow(cfg)
                     AutoLoad     = LibConfig.AutoLoad,
                     AutoLoadSave = LibConfig.AutoLoadSave,
                 }
-                local ok, err = SaveData(LibConfig.SaveName, data)
-                -- Feedback via button flash handled in AddButton
+                SaveData(LibConfig.SaveName, data)
             end,
         })
 
-        -- Select save to load
         local selectedLoad = ""
         cfgTab:AddDropdown({
             Name    = "Select Save",
@@ -1544,7 +1632,6 @@ function NeonHub:CreateWindow(cfg)
             Callback = function(v) selectedLoad = v end,
         })
 
-        -- Load button
         cfgTab:AddButton({
             Name = "📂  Load Selected Save",
             Callback = function()
@@ -1563,13 +1650,13 @@ function NeonHub:CreateWindow(cfg)
                     LibConfig.SaveName     = lc.SaveName     or LibConfig.SaveName
                     LibConfig.AutoLoad     = lc.AutoLoad     or false
                     LibConfig.AutoLoadSave = lc.AutoLoadSave or ""
+                    ApplyTheme(LibConfig.Theme)
                 end
             end,
         })
 
         cfgTab:AddSection({Name="Auto Load"})
 
-        -- Auto-load save dropdown
         cfgTab:AddDropdown({
             Name    = "Auto Load Save",
             Options = GetSaves(),
@@ -1577,7 +1664,6 @@ function NeonHub:CreateWindow(cfg)
             Callback = function(v) LibConfig.AutoLoadSave = v end,
         })
 
-        -- Auto-load toggle
         cfgTab:AddToggle({
             Name    = "Enable Auto Load",
             Default = LibConfig.AutoLoad,
@@ -1597,7 +1683,7 @@ function NeonHub:CreateWindow(cfg)
         })
     end
 
-    -- Auto-load on launch if configured
+    -- Auto-load na inicialização
     task.defer(function()
         if LibConfig.AutoLoad and LibConfig.AutoLoadSave ~= "" then
             local data = LoadData(LibConfig.AutoLoadSave)
@@ -1617,38 +1703,42 @@ end
 return NeonHub
 
 -- ══════════════════════════════════════════════════════════════
--- ══════════════════════════════════════════════════════════════
---  EXAMPLE USAGE  (delete or adapt as needed)
--- ══════════════════════════════════════════════════════════════
+--  EXEMPLO DE USO COMPLETO
 -- ══════════════════════════════════════════════════════════════
 --[[
 
-local NeonHub = loadstring(game:HttpGet("YOUR_RAW_URL"))()
+local NeonHub = loadstring(game:HttpGet("SUA_URL_AQUI"))()
 
 -- ─── 1. Key System ───────────────────────────────────────────
+-- Os parâmetros Minimize_button_image_id e UI_Library_Fund
+-- devem ser passados aqui, no KeySystem.
 local passed = NeonHub:KeySystem({
     Text         = "Key System",
     KeySystem    = true,
     Key          = "123",
     AutoSaveKey  = true,
-    KeyJson      = "Key_LoHub.json",
-    GetKeyBySite = true,
-    KeySite      = "https://pastebin.com/raw/YOURPASTE",
+    KeyJson      = "Key_NeonHub.json",
+    GetKeyBySite = false,
+    KeySite      = "",
+
+    -- ID da imagem do botão de minimizar/abrir (deixe "" para ícone padrão ☰)
+    Minimize_button_image_id = (""),   -- ex: ("7733960981")
+
+    -- ID da imagem de fundo da UI (deixe "" para sem imagem)
+    UI_Library_Fund = (""),            -- ex: ("12345678")
 })
 if not passed then return end
 
 -- ─── 2. Loading Screen ───────────────────────────────────────
 NeonHub:LoadingScreen({
     LoadingText = "Welcome Back!",
-    Duration    = 10,
+    Duration    = 5,
 })
 
 -- ─── 3. Window ───────────────────────────────────────────────
 local Win = NeonHub:CreateWindow({
-    Name              = "NeonHub",
-    SubTitle          = "by .ftgs",
-    ToggleImageId     = "",   -- e.g. "7733960981" (any Roblox image asset id)
-    BackgroundImageId = "",   -- e.g. "12345678"
+    Name     = "NeonHub",
+    SubTitle = "by .ftgs",
 })
 
 -- ─── 4. Main Tab ─────────────────────────────────────────────
@@ -1656,47 +1746,35 @@ local Main = Win:AddTab("Main", "🏠")
 
 Main:AddSection({Name = "Aimbot"})
 
-local toggleEl = Main:AddToggle({
-    Name     = "Silent Aim",
-    Default  = false,
-    Flag     = "SilentAim",
-    Callback = function(v) print("Silent Aim:", v) end,
+Main:AddToggle({
+    Name="Silent Aim", Default=false, Flag="SilentAim",
+    Callback=function(v) print("Silent Aim:", v) end,
 })
 
-local sliderEl = Main:AddSlider({
-    Name      = "FOV Size",
-    Min       = 1,
-    Max       = 360,
-    Default   = 90,
-    Increment = 1,
-    Suffix    = "°",
-    Flag      = "AimFOV",
-    Callback  = function(v) print("FOV:", v) end,
+Main:AddSlider({
+    Name="FOV Size", Min=1, Max=360, Default=90, Increment=1, Suffix="°", Flag="AimFOV",
+    Callback=function(v) print("FOV:", v) end,
 })
 
 Main:AddSection({Name = "Visuals"})
 
 Main:AddColorPicker({
-    Name     = "ESP Color",
-    Default  = Color3.fromRGB(0,200,100),
-    Flag     = "ESPColor",
-    Callback = function(c) print("Color:", c) end,
+    Name="ESP Color", Default=Color3.fromRGB(0,200,100), Flag="ESPColor",
+    Callback=function(c) print("Color:", c) end,
 })
 
 Main:AddDropdown({
-    Name     = "Bone Priority",
-    Options  = {"Head","Neck","Chest","Waist","Left Arm","Right Arm","Left Leg","Right Leg"},
-    Default  = "Head",
-    Flag     = "BonePriority",
-    Callback = function(v) print("Bone:", v) end,
+    Name="Bone Priority",
+    Options={"Head","Neck","Chest","Waist","Left Arm","Right Arm","Left Leg","Right Leg"},
+    Default="Head", Flag="BonePriority",
+    Callback=function(v) print("Bone:", v) end,
 })
 
 Main:AddMultiDropdown({
-    Name     = "ESP Parts",
-    Options  = {"Box","Tracer","Name","Healthbar","Distance","Skeleton"},
-    Default  = {"Box","Name"},
-    Flag     = "ESPParts",
-    Callback = function(sel) print("Parts:", table.concat(sel,", ")) end,
+    Name="ESP Parts",
+    Options={"Box","Tracer","Name","Healthbar","Distance","Skeleton"},
+    Default={"Box","Name"}, Flag="ESPParts",
+    Callback=function(sel) print("Parts:", table.concat(sel,", ")) end,
 })
 
 -- ─── 5. Misc Tab ─────────────────────────────────────────────
@@ -1704,7 +1782,7 @@ local Misc = Win:AddTab("Misc", "⚡")
 
 Misc:AddSection({Name = "Movement"})
 
-local speedSlider = Misc:AddSlider({
+Misc:AddSlider({
     Name="Walk Speed", Min=16, Max=250, Default=16, Flag="WalkSpeed",
     Callback=function(v) game.Players.LocalPlayer.Character.Humanoid.WalkSpeed=v end,
 })
@@ -1746,7 +1824,7 @@ Misc:AddTextBox({
 
 Misc:AddParagraph({
     Title  = "NeonHub Info",
-    Content= "Version 2.0 | Mobile Optimized | 20 Themes | 15 Elements",
+    Content= "Version 2.1 | Mobile Optimized | 20 Themes | 15 Elements",
 })
 
 local prog = Misc:AddProgressBar({
