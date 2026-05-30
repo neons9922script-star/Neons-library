@@ -298,14 +298,46 @@ function NeonHub:KeySystem(cfg)
         Size=UDim2.fromScale(1,1), TextXAlignment=Enum.TextXAlignment.Center, Parent=hdr,
     })
 
+    -- ── Altura dinâmica: cresce se tiver botões de site/copiar ──
+    local extraH = 0
+    if cfg.GetKeyBySite and cfg.KeySite ~= "" then extraH = 58 end
+
+    win.Size = UDim2.fromOffset(370, 210 + extraH)
+
+    -- Posições base dos elementos principais
+    local boxY    = 52 + extraH   -- TextBox de key
+    local errY    = boxY + 48     -- Label de erro
+    local submitY = errY + 18     -- Botão submit
+
     if cfg.GetKeyBySite and cfg.KeySite ~= "" then
+        -- Linha 1: botão "Abrir site"
         local linkBtn = New("TextButton", {
-            Text="🔗 Get Key from Site", Font=Enum.Font.GothamSemibold, TextSize=12,
-            TextColor3=T.Acc, BackgroundTransparency=1,
-            Size=UDim2.new(1,0,0,22), Position=UDim2.fromOffset(0,50), Parent=win,
+            Text="🔗  Get Key from Site", Font=Enum.Font.GothamSemibold, TextSize=12,
+            TextColor3=T.Acc, BackgroundColor3=T.El, BorderSizePixel=0,
+            Size=UDim2.new(1,-40,0,26), Position=UDim2.fromOffset(20,50), Parent=win,
         })
+        New("UICorner", {CornerRadius=UDim.new(0,7), Parent=linkBtn})
+        New("UIStroke", {Color=T.Brd, Thickness=1, Parent=linkBtn})
         linkBtn.MouseButton1Click:Connect(function()
             pcall(function() game:GetService("GuiService"):OpenBrowserWindow(cfg.KeySite) end)
+        end)
+
+        -- Linha 2: botão "Copiar link"
+        local copyBtn = New("TextButton", {
+            Text="📋  Copy Link", Font=Enum.Font.GothamSemibold, TextSize=12,
+            TextColor3=T.Tx, BackgroundColor3=T.Btn, BorderSizePixel=0,
+            Size=UDim2.new(1,-40,0,26), Position=UDim2.fromOffset(20,82), Parent=win,
+        })
+        New("UICorner", {CornerRadius=UDim.new(0,7), Parent=copyBtn})
+        New("UIStroke", {Color=T.Brd, Thickness=1, Parent=copyBtn})
+        copyBtn.MouseButton1Click:Connect(function()
+            pcall(setclipboard, cfg.KeySite)
+            copyBtn.Text = "✅  Copied!"
+            copyBtn.TextColor3 = T.Acc
+            task.delay(1.5, function()
+                copyBtn.Text = "📋  Copy Link"
+                copyBtn.TextColor3 = T.Tx
+            end)
         end)
     end
 
@@ -314,7 +346,7 @@ function NeonHub:KeySystem(cfg)
         Font=Enum.Font.Gotham, TextSize=14,
         TextColor3=T.Tx, PlaceholderColor3=T.Sub,
         BackgroundColor3=T.El, BorderSizePixel=0,
-        Size=UDim2.new(1,-40,0,42), Position=UDim2.fromOffset(20,78),
+        Size=UDim2.new(1,-40,0,42), Position=UDim2.fromOffset(20, boxY),
         ClearTextOnFocus=false, Parent=win,
     })
     New("UICorner", {CornerRadius=UDim.new(0,8), Parent=box})
@@ -324,13 +356,13 @@ function NeonHub:KeySystem(cfg)
     local errLbl = New("TextLabel", {
         Text="", Font=Enum.Font.Gotham, TextSize=12,
         TextColor3=Color3.fromRGB(255,80,80), BackgroundTransparency=1,
-        Size=UDim2.new(1,-40,0,16), Position=UDim2.fromOffset(20,124), Parent=win,
+        Size=UDim2.new(1,-40,0,16), Position=UDim2.fromOffset(20, errY), Parent=win,
     })
 
     local submitBtn = New("TextButton", {
         Text="Submit", Font=Enum.Font.GothamBold, TextSize=15,
         TextColor3=Color3.fromRGB(255,255,255), BackgroundColor3=T.Acc,
-        BorderSizePixel=0, Size=UDim2.new(1,-40,0,40), Position=UDim2.fromOffset(20,144),
+        BorderSizePixel=0, Size=UDim2.new(1,-40,0,40), Position=UDim2.fromOffset(20, submitY),
         Parent=win,
     })
     New("UICorner", {CornerRadius=UDim.new(0,8), Parent=submitBtn})
@@ -349,7 +381,7 @@ function NeonHub:KeySystem(cfg)
         if entered == cfg.Key or valid then
             if cfg.AutoSaveKey then pcall(writefile, cfg.KeyJson, entered) end
             result = true
-            Tween(win, {Size=UDim2.fromOffset(370,0)}, 0.2)
+            Tween(win, {Size=UDim2.fromOffset(370, 0)}, 0.2)
             task.delay(0.25, function() gui:Destroy() end)
         else
             errLbl.Text = "❌  Invalid key — please try again."
